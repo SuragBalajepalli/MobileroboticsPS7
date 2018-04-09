@@ -418,13 +418,13 @@ void TrajBuilder::build_braking_traj(geometry_msgs::PoseStamped start_pose,
 		for (int i = 0; i < npts_ramp; i++) {
         speed_des -= accel_max_*dt_; //Euler one-step integration
         des_state.twist.twist.linear.x = speed_des;
-        x_des += speed_des * dt_ * cos(psi_des); //Euler one-step integration
-        y_des += speed_des * dt_ * sin(psi_des); //Euler one-step integration        
+        x_des += -accel_max_ * dt_ * dt_ * cos(psi_des); //Euler one-step integration
+        y_des += -accel_max_ * dt_ * dt_ * sin(psi_des); //Euler one-step integration        
         des_state.pose.pose.position.x = x_des;
         des_state.pose.pose.position.y = y_des;
         omega_des -= alpha_max_*dt_; //Euler one-step integration
         des_state.twist.twist.angular.z = omega_des;
-        psi_des += omega_des*dt_; //Euler one-step integration
+        psi_des += -alpha_max_*dt_ *dt_; //Euler one-step integration
         des_state.pose.pose.orientation = convertPlanarPsi2Quaternion(psi_des);
         vec_of_states.push_back(des_state);
     	}
