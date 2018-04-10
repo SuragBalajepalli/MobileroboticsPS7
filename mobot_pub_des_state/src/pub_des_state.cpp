@@ -146,29 +146,21 @@ void DesStatePublisher::pub_next_state() {
         if (motion_mode_ != E_STOPPED) {
             ROS_WARN("e-stop reset while not in e-stop mode");
         }
-        else if (lidar_trigger_) {
+        else {
+            motion_mode_ = DONE_W_SUBGOAL; //this will pick up where left off
+            }
+        }    
+    if (lidar_trigger_) {
             lidar_trigger_=false;
-            if(motion_mode_!=ALARM_HALTED) {
             trajBuilder_.build_braking_traj(current_pose_,des_state_vec_);
             motion_mode_=ALARM_HALTING;
             traj_pt_i_=0;
             npts_traj_=des_state_vec_.size();
        	 	}
-       	 	else {
-       	 		geometry_msgs::PoseStamped spin_pose;
-       	 		spin_pose=current_pose_;
-       	 		double current_psi=trajBuilder_.convertPlanarQuat2Psi(current_pose_.pose.orientation);
-       	 		double des_spin_psi=current_psi+0.1;
-       	 		spin_pose.pose.orientation=trajBuilder_.convertPlanarPsi2Quaternion(des_spin_psi);
-       	 		trajBuilder_.build_spin_traj(current_pose_,spin_pose,des_state_vec_);
-       	 		motion_mode_=ALARM_REORIENTATION;
-       	 		traj_pt_i_=0;
-       	 		npts_traj_=des_state_vec_.size();
-       	 	}
-       	 }
-        else if(lidar_reset_) {
+       	 	
+    else if(lidar_reset_) {
             lidar_reset_=false;
-            if (motion_mode_ !=E_STOPPED) {
+            if (motion_mode_ !=ALARM_HALTED) {
                 ROS_WARN("Lidar reset while not in stopped mode");
             }
             //OK...want to resume motion from e-stopped mode;
@@ -176,7 +168,7 @@ void DesStatePublisher::pub_next_state() {
             motion_mode_ = DONE_W_SUBGOAL; //this will pick up where left off
             }
         }
-    }
+    
 
     //REDUNDANCIES IN STATES TO ACCOMODATE INTUITIVE NAMING; COULD BE CHANGED
     //state machine; results in publishing a new desired state
@@ -186,7 +178,13 @@ void DesStatePublisher::pub_next_state() {
             break;
 
         case ALARM_HALTED:
-        	desired_state_publisher_.publish(halt_state_);
+        	current_des_state_.twist.twist.angular.z= 0.1;
+            desired_state_publisher_.publish(current_des_state_);
+            des_psi_ = trajBuilder_.convertPlanarQuat2Psi(current_pose_.pose.orientation)+0.1;
+            float_msg_.data = des_psi_;
+            des_psi_publisher_.publish(float_msg_); 
+            
+
             break;
 
 
@@ -210,34 +208,8 @@ void DesStatePublisher::pub_next_state() {
                 current_des_state_ = seg_end_state_;
                 motion_mode_ = ALARM_HALTED; //change state to remain halted                    
             }
-
-       	case ALARM_REORIENTATION:
-       		current_des_state_ = des_state_vec_[traj_pt_i_];
-            current_des_state_.header.stamp = ros::Time::now();
-            desired_state_publisher_.publish(current_des_state_);
-            current_pose_.pose = current_des_state_.pose.pose;
-            current_pose_.header = current_des_state_.header;
-            des_psi_ = trajBuilder_.convertPlanarQuat2Psi(current_pose_.pose.orientation);
-            float_msg_.data = des_psi_;
-            des_psi_publisher_.publish(float_msg_); 
-            
-            traj_pt_i_++;
-            
-            if (traj_pt_i_ >= npts_traj_) { //here if completed all pts of braking traj
-                halt_state_ = des_state_vec_.back(); //last point of halting traj
-                // make sure it has 0 twist
-                halt_state_.twist.twist = halt_twist_;
-                seg_end_state_ = halt_state_;
-                current_des_state_ = seg_end_state_;
-                motion_mode_ = ALARM_HALTED; //change state to remain halted                    
-            }
             break;
-
-
-
-
-
-
+       	
         case HALTING: //e-stop service callback sets this mode
             //if need to brake from e-stop, service will have computed
             // new des_state_vec_, set indices and set motion mode;

@@ -405,7 +405,8 @@ void TrajBuilder::build_triangular_spin_traj(geometry_msgs::PoseStamped start_po
 //compute trajectory corresponding to applying max prudent decel to halt
 void TrajBuilder::build_braking_traj(geometry_msgs::PoseStamped start_pose,
         std::vector<nav_msgs::Odometry> &vec_of_states) {
-		nav_msgs::Odometry des_state;
+		vec_of_states.clear();
+        nav_msgs::Odometry des_state;
 		double omega_des;
 		double psi_start = convertPlanarQuat2Psi(start_pose.pose.orientation);
 		double psi_des = psi_start;
@@ -416,13 +417,13 @@ void TrajBuilder::build_braking_traj(geometry_msgs::PoseStamped start_pose,
     	double speed_des = 0.0;
 		int npts_ramp=1/dt_;
 		for (int i = 0; i < npts_ramp; i++) {
-        speed_des -= accel_max_*dt_; //Euler one-step integration
+        speed_des = accel_max_*dt_; //Euler one-step integration
         des_state.twist.twist.linear.x = speed_des;
         x_des += -accel_max_ * dt_ * dt_ * cos(psi_des); //Euler one-step integration
         y_des += -accel_max_ * dt_ * dt_ * sin(psi_des); //Euler one-step integration        
         des_state.pose.pose.position.x = x_des;
         des_state.pose.pose.position.y = y_des;
-        omega_des -= alpha_max_*dt_; //Euler one-step integration
+        omega_des += -alpha_max_*dt_; //Euler one-step integration
         des_state.twist.twist.angular.z = omega_des;
         psi_des += -alpha_max_*dt_ *dt_; //Euler one-step integration
         des_state.pose.pose.orientation = convertPlanarPsi2Quaternion(psi_des);
